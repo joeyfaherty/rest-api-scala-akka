@@ -30,24 +30,35 @@ object Controller {
 
     val hotels = readAndParseCsv(filePath)
 
+    val grouped: Map[String, immutable.Seq[Hotel]] = hotels
+                    .groupBy(h => h.city)
+
     implicit val system = ActorSystem("my-system")
     implicit val materializer = ActorMaterializer()
     // needed for the future flatMap/onComplete in the end
     implicit val executionContext = system.dispatcher
 
     // (fake) async database query api
-    def fetchItem(hotelId: Long, hotels: Seq[Hotel]): Future[Option[Hotel]] = Future {
+    def getHotelById(hotelId: Long, hotels: Seq[Hotel]): Future[Option[Hotel]] = Future {
       hotels.find(o => o.id == hotelId)
+    }
+
+    def getHotelsByCity(city: String, grouped: Map[String, immutable.Seq[Hotel]]): Future[Option[Seq[Hotel]]] = Future {
+      grouped.get(city)
+/*      grouped.get(city) match {
+        case Some(h) => h
+        case None => println(s"Sorry, city $city not found in our records"); Seq()
+      }*/
     }
 
     val route =
       get {
-        pathPrefix("hotel" / LongNumber) { id =>
+        pathPrefix("hotel" / Remaining) { city =>
           // there might be no item for a given id
-          val maybeHotel: Future[Option[Hotel]] = fetchItem(id, hotels)
+          val maybeHotels: Future[Option[Seq[Hotel]]] = getHotelsByCity(city, grouped)
 
-          onSuccess(maybeHotel) {
-            case Some(hotel) => complete(HttpEntity(ContentTypes.`application/json`, hotel.toJson.prettyPrint))
+          onSuccess(maybeHotels) {
+            case Some(l) => complete(HttpEntity(ContentTypes.`application/json`, l.toJson.prettyPrint))
             case None       => complete(StatusCodes.NotFound)
           }
         }
