@@ -1,0 +1,10 @@
+.idea/**
+.settings
+.classpath
+.project
+.cache
+*.iml
+*.log*
+*.swp
+metastore_db
+target
