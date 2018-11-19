@@ -16,6 +16,7 @@ import spray.json._
 import scala.util.{Failure, Success}
 
 trait HotelResource {
+
   val actorShard: ActorRef
   implicit val timeout: Timeout
 

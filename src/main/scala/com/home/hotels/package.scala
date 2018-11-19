@@ -11,6 +11,8 @@ package object hotels {
 
   final case class Hotel(city: String, id: Long, room: String, price: Long)
 
+  case object RateLimitExceeded extends RuntimeException
+
   def getOrdering(sort: Option[String]): Ordering[Long] = {
     val ordering = sort match {
       case Some(param) => {

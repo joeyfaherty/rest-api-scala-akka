@@ -3,30 +3,29 @@ package com.home.hotels.actors
 import akka.actor.{Actor, ActorLogging}
 import akka.cluster.sharding.ShardRegion
 import akka.pattern.{CircuitBreaker, CircuitBreakerOpenException, pipe}
-import com.home.hotels.Hotel
+import com.home.hotels.{Hotel, RateLimitExceeded}
 import com.home.hotels.Server.system
 import com.home.hotels.actors.ActorType.{RequestBlocked, RequestLimited}
 import com.home.hotels.ratelimiter.RateLimiter
-import com.home.hotels.ratelimiter.RateLimiter.RateLimitExceeded
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-class RequestActor extends Actor with ActorLogging {
+class ClientActor extends Actor with ActorLogging {
 
   // use config from application.conf
   val config = system.settings.config
 
   val breaker = CircuitBreaker(
-    context.system.scheduler,
+    scheduler = context.system.scheduler,
     maxFailures = 5,
     callTimeout = config.getInt("rateLimit.limitHitSuspensionMinutes").minutes,
     resetTimeout = config.getInt("rateLimit.limitHitSuspension").minutes
   )
 
   val limiter = new RateLimiter(
-    config.getInt("rateLimit.requests"),
-    config.getInt("rateLimit.timeWindowSeconds").seconds
+    requests = config.getInt("rateLimit.requests"),
+    period = config.getInt("rateLimit.timeWindowSeconds").seconds
   )
 
   implicit val ec: ExecutionContext = context.dispatcher
@@ -35,6 +34,10 @@ class RequestActor extends Actor with ActorLogging {
     case hotels: Option[Seq[Hotel]] =>
       log.info(s"Received hotels: $hotels")
       val theSender = sender()
+
+      // the circuit breaker wraps the rate limiter to ensure that when the call limit is
+      // exceeded, the Rate Limiter fails and if you exceed the Rate Limiter too often,
+      // then the Circuit Breaker will open
       breaker.withCircuitBreaker {
         limiter.call {
           Future.successful(hotels) pipeTo theSender

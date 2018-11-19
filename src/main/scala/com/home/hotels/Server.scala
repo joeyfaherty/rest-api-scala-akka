@@ -5,14 +5,14 @@ import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import com.home.hotels.actors.{ActorType, RequestActor}
+import com.home.hotels.actors.{ActorType, ClientActor}
 import com.home.hotels.resource.HotelResource
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  *
+  * In this case each Actor represents a client
   */
 object Server extends App with HotelResource {
   implicit val system = ActorSystem("agoda")
@@ -21,9 +21,11 @@ object Server extends App with HotelResource {
   implicit val timeout = Timeout(3.seconds)
   val config = system.settings.config
 
+
+  // akka cluster sharding is used to represent the requests
   val actorShard = ClusterSharding(system).start(
     typeName = ActorType.Sharding.shardName,
-    entityProps = Props[RequestActor],
+    entityProps = Props[ClientActor],
     settings = ClusterShardingSettings(system),
     extractEntityId = ActorType.Sharding.extractEntityId,
     extractShardId = ActorType.Sharding.shardIdExtractor(config.getInt("clients.sharding.number-of-shards"))
